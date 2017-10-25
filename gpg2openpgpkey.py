@@ -6,8 +6,8 @@
 # Tested with gnupg 1.x and 2.x.
 #
 
-import os, sys, time, rfc822, getopt
-import tempfile, shutil, subprocess, threading, base64, hashlib
+import os, sys, time, getopt, email.utils
+import tempfile, shutil, subprocess, threading, binascii, base64, hashlib
 from tempfile import mkdtemp
 
 PROGNAME    = os.path.basename(sys.argv[0])
@@ -72,8 +72,23 @@ def process_args(arguments):
 
 def stringchunks(s, n):
     """Yield n-octet sized chunks from string s"""
-    for i in xrange(0, len(s), n):
-        yield s[i:i+n]
+    if sys.version_info.major == 3:
+        for i in range(0, len(s), n):
+            yield s[i:i+n]
+    else:
+        for i in xrange(0, len(s), n):
+            yield s[i:i+n]
+
+
+def string2bytes(s, encoding='utf-8'):
+    if s is None:
+        return s
+    else:
+        try:
+            b = bytes(s, encoding)
+        except TypeError:
+            b = bytes(s)
+        return b
 
 
 def cmd_gpg_import(homedir):
@@ -104,6 +119,8 @@ def parse_key(indata, keydata):
     pubkeySeen = False
     currentKey = None
 
+    indata = indata.decode()
+
     for line in indata.split('\n'):
         parts = line.split(':')
         rectype = parts[0]
@@ -123,7 +140,7 @@ def parse_key(indata, keydata):
         elif rectype == 'uid':
             userid = parts[9]
             if p:
-                _, email = rfc822.parseaddr(userid)
+                _, emailaddr = email.utils.parseaddr(userid)
                 p.add_uid(userid)
             else:
                 error_quit(11, "ERROR: uid found without preceding pubkey.")
@@ -166,14 +183,14 @@ class OpenPGPKey:
         self.fingerprint = fpr
 
     def add_uid(self, uid):
-        name, address = rfc822.parseaddr(uid)
+        name, address = email.utils.parseaddr(uid)
         self.uidlist.append((name, address))
 
     def add_subkey(self, subkey):
         self.subkeys.append(subkey)
 
     def has_uid(self, uid):
-        name, address = rfc822.parseaddr(uid)
+        name, address = email.utils.parseaddr(uid)
         return address in [x[1] for x in self.uidlist]
 
     def printInfo(self, subkey=False):
@@ -183,7 +200,7 @@ class OpenPGPKey:
             self.alg, ALG_PUBKEY.get(self.alg), self.keylen, self.flags))
         print("  CreateDate: {}".format(unixtime2date(self.createDate)))
         for u in self.uidlist:
-            print("    uid: {}".format(rfc822.dump_address_pair(u)))
+            print("    uid: {}".format(email.utils.formataddr(u)))
         for s in self.subkeys:
             s.printInfo(subkey=True)
 
@@ -194,6 +211,7 @@ class RunProgram(threading.Thread):
         threading.Thread.__init__(self)
         self.cmd = cmd
         self.indata = indata
+        self.indata = string2bytes(indata)
         self.timeout = timeout
         self.output = ""
 
@@ -215,34 +233,34 @@ class RunProgram(threading.Thread):
 
 
 def validate_uid(inputstring):
-    name, email = rfc822.parseaddr(inputstring)
-    if "@" in email:
-        return email
+    name, address = email.utils.parseaddr(inputstring)
+    if "@" in address:
+        return address
     else:
         return None
 
 
-def get_ownername(email):
+def get_ownername(emailaddr):
     """Return OPENPGPKEY ownername for given PGP uid/email address"""
-    localpart, rhs = email.split('@')
+    localpart, rhs = emailaddr.split('@')
     h = hashlib.sha256()
-    h.update(localpart)
+    h.update(string2bytes(localpart))
     owner = "%s._openpgpkey.%s" % (h.hexdigest()[0:56], rhs)
     if not owner.endswith('.'):
         owner = owner + '.'
     return owner
 
 
-def gen_openpgpkey(email, keydata, generic=False):
-    owner = get_ownername(email)
+def gen_openpgpkey(emailaddr, keydata, generic=False):
+    owner = get_ownername(emailaddr)
     if not generic:
         output = "{} IN OPENPGPKEY (\n".format(owner)
         for line in stringchunks(base64.standard_b64encode(keydata), 60):
-            output += "                  {}\n".format(line)
+            output += "                  {}\n".format(line.decode())
     else:
         output = "{} IN TYPE61 \# {} (\n".format(owner, len(keydata))
-        for line in stringchunks(keydata.encode('hex'), 60):
-            output += "                  {}\n".format(line)
+        for line in stringchunks(binascii.hexlify(keydata), 60):
+            output += "                  {}\n".format(line.decode())
     output += ")"
     return output
 
