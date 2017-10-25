@@ -240,7 +240,7 @@ def gen_openpgpkey(email, keydata, generic=False):
         for line in stringchunks(base64.standard_b64encode(keydata), 60):
             output += "                  {}\n".format(line)
     else:
-        output = "{} IN TYPE61 \# {} (".format(owner, len(keydata))
+        output = "{} IN TYPE61 \# {} (\n".format(owner, len(keydata))
         for line in stringchunks(keydata.encode('hex'), 60):
             output += "                  {}\n".format(line)
     output += ")"
