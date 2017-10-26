@@ -140,7 +140,6 @@ def parse_key(indata, keydata):
         elif rectype == 'uid':
             userid = parts[9]
             if p:
-                _, emailaddr = email.utils.parseaddr(userid)
                 p.add_uid(userid)
             else:
                 error_quit(11, "ERROR: uid found without preceding pubkey.")
@@ -193,16 +192,20 @@ class OpenPGPKey:
         name, address = email.utils.parseaddr(uid)
         return address in [x[1] for x in self.uidlist]
 
-    def printInfo(self, subkey=False):
-        print("OpenPGPKey:" if not subkey else "SubKey:")
-        print("  keyid={} fpr={}".format(self.keyid, self.fingerprint))
-        print("  algorithm={} ({}) keylen={} flags=[{}]".format(
-            self.alg, ALG_PUBKEY.get(self.alg), self.keylen, self.flags))
-        print("  CreateDate: {}".format(unixtime2date(self.createDate)))
+    def Info(self, subkey=False):
+        out = "OpenPGPKey:\n" if not subkey else "SubKey:\n"
+        out += "  keyid={} fpr={}\n".format(self.keyid, self.fingerprint)
+        out += "  algorithm={} ({}) keylen={} flags=[{}]\n".format(
+            self.alg, ALG_PUBKEY.get(self.alg), self.keylen, self.flags)
+        out += "  CreateDate: {}\n".format(unixtime2date(self.createDate))
         for u in self.uidlist:
-            print("    uid: {}".format(email.utils.formataddr(u)))
+            out += "    uid: {}\n".format(email.utils.formataddr(u))
         for s in self.subkeys:
-            s.printInfo(subkey=True)
+            out += s.Info(subkey=True)
+        return out
+
+    def __repr__(self):
+        return self.Info()
 
 
 class RunProgram(threading.Thread):
@@ -307,7 +310,7 @@ if __name__ == '__main__':
     pgpkey = parse_key(c.output, keydata)
     if not pgpkey:
         error_quit(11, "couldn't parse openpgp key")
-    pgpkey.printInfo()
+    print(pgpkey.Info())
 
     if not pgpkey.has_uid(uid):
         error_quit(11, "couldn't find uid {} in given key".format(uid))
