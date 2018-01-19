@@ -173,6 +173,7 @@ class OpenPGPKey:
         self.createDate = float(date)
         self.uidlist = []               # list of rfc822 (name, address) tuples
         self.subkeys = []               # list of OpenPGPKey objects
+        self.errors = []                # list of collected errors in parsing
         if keydata:
             self.keydata = keydata
         else:
@@ -181,9 +182,15 @@ class OpenPGPKey:
     def set_fingerprint(self, fpr):
         self.fingerprint = fpr
 
+    def add_error(self, error):
+        self.errors.append(error)
+
     def add_uid(self, uid):
         name, address = email.utils.parseaddr(uid)
-        self.uidlist.append((name, address))
+        if '@' not in address:
+            self.add_error("Unable to parse uid: {}".format(uid))
+        else:
+            self.uidlist.append((name, address))
 
     def add_subkey(self, subkey):
         self.subkeys.append(subkey)
@@ -202,6 +209,10 @@ class OpenPGPKey:
             out += "    uid: {}\n".format(email.utils.formataddr(u))
         for s in self.subkeys:
             out += s.Info(subkey=True)
+        if self.errors:
+            out += ">> Errors/Warnings:\n"
+            for e in self.errors:
+                out += "   * {}\n".format(e)
         return out
 
     def __repr__(self):
