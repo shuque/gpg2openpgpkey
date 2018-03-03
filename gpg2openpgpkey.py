@@ -324,7 +324,7 @@ if __name__ == '__main__':
     print(pgpkey.Info())
 
     if not pgpkey.has_uid(uid):
-        error_quit(11, "couldn't find uid {} in given key".format(uid))
+        print("WARNING: couldn't find uid {} in given key".format(uid))
     print('')
 
     c = RunProgram(cmd_gpg_export(GPGDIR, uid), None, GPG_TIMEOUT)
