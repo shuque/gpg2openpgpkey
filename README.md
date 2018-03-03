@@ -11,8 +11,6 @@ Pre-requisites:
 - Python 2.7 or later, or Python 3  
 
 ```
-resolve.py version 0.14
-
 $ gpg2openpgpkey.py
 
 Usage: gpg2openpgpkey.py [-g] <email> <gpgkeyfile>
