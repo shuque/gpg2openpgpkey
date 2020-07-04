@@ -6,7 +6,7 @@
 # Tested with gnupg 1.x and 2.x.
 #
 
-import os, sys, time, getopt, email.utils
+import os, sys, time, getopt, email.utils, errno
 import tempfile, shutil, subprocess, threading, binascii, base64, hashlib
 from tempfile import mkdtemp
 
@@ -306,6 +306,12 @@ if __name__ == '__main__':
         error_quit(11, "invalid uid specified", None)
     keydata = open(infile).read()
 
+    try:
+        os.makedirs(DIR)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
+
     GPGDIR = mkdtemp(prefix="x", dir=DIR)
 
     c = RunProgram(cmd_gpg_import(GPGDIR), keydata, GPG_TIMEOUT)
@@ -337,3 +343,8 @@ if __name__ == '__main__':
     if not rmtree(GPGDIR):
         print("ERROR: deleting gpg directory: {}".format(GPGDIR))
         sys.exit(11)
+
+    try:
+        os.rmdir(DIR)
+    except (FileNotFoundError, OSError):
+        pass
