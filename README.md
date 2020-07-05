@@ -11,15 +11,24 @@ Pre-requisites:
 - Python 2.7 or later, or Python 3  
 
 ```
-$ gpg2openpgpkey.py
+$ gpg2openpgpkey -h
 
-Usage: gpg2openpgpkey.py [-g] <email> <gpgkeyfile>
+gpg2openpgpkey.py version 0.1
+Usage: gpg2openpgpkey.py [-g] [-h] <email> <gpgkeyfile>
 
-       -g     Output DNS generic RDATA format (rather than OPENPGPKEY)
+       -g       Output DNS generic RDATA format (rather than OPENPGPKEY)
+       -d DIR   Use DIR as base directory (default: /tmp/openpgpkey
+       -c       Create and cleanup base directory as needed
+       -h       Print this help message
 
 Given an email address and a file containing a GPG public key, this program
 generates a corresponding DNS OPENPGPKEY resource record in presentation
 format.
+
+This program uses /tmp/openpgpkey as the base directory for the temporary GPG
+keyring files it generates. Make sure this directory exists and is writable
+by the invoker. Or use the "-c" option to have the directory automatically
+created and deleted.
 ```
 
 Some example output:  

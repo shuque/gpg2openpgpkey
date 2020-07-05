@@ -14,8 +14,9 @@ PROGNAME    = os.path.basename(sys.argv[0])
 VERSION     = "0.1"
 GPG         = "gpg"
 GPG_TIMEOUT = 5
-DIR         = "/var/tmp/openpgpkey"
+BASEDIR     = "/tmp/openpgpkey"
 GPGDIR      = None
+CREATEDIR   = False
 GENERIC     = False                            # Generate generic rdata?
 
 
@@ -35,37 +36,49 @@ ALG_PUBKEY = {
 
 
 def usage(msg=None):
-    if msg: print("Error: {}\n".format(msg))
+    if msg:
+        print("Error: {}\n".format(msg))
     print("""\
 {0} version {1}
 Usage: {0} [-g] [-h] <email> <gpgkeyfile>
 
-       -g     Output DNS generic RDATA format (rather than OPENPGPKEY)
-       -h     Print this help message
+       -g       Output DNS generic RDATA format (rather than OPENPGPKEY)
+       -d DIR   Use DIR as base directory (default: {2}
+       -c       Create and cleanup base directory as needed
+       -h       Print this help message
 
 Given an email address and a file containing a GPG public key, this program
 generates a corresponding DNS OPENPGPKEY resource record in presentation
 format.
-""".format(PROGNAME, VERSION))
+
+This program uses {2} as the base directory for the temporary GPG
+keyring files it generates. Make sure this directory exists and is writable
+by the invoker. Or use the "-c" option to have the directory automatically
+created and deleted.
+""".format(PROGNAME, VERSION, BASEDIR))
     sys.exit(2)
 
 
 def process_args(arguments):
     """Process command line arguments"""
-    global GENERIC
+    global GENERIC, CREATEDIR, BASEDIR
     try:
-        (options, args) = getopt.getopt(sys.argv[1:], 'g')
+        (options, args) = getopt.getopt(sys.argv[1:], 'gd:hc')
     except getopt.GetoptError:
         usage()
-
-    if len(args) != 2:
-        usage("Incorrect number of arguments.")
 
     for option, value in options:
         if option == "-g":
             GENERIC = True
+        elif option == "-d":
+            BASEDIR = value
+        elif option == "-c":
+            CREATEDIR = True
         elif option == "-h":
             usage()
+
+    if len(args) != 2:
+        usage("Incorrect number of arguments.")
 
     return (args)
 
@@ -306,13 +319,17 @@ if __name__ == '__main__':
         error_quit(11, "invalid uid specified", None)
     keydata = open(infile).read()
 
-    try:
-        os.makedirs(DIR)
-    except OSError as e:
-        if e.errno != errno.EEXIST:
-            raise
+    if not os.path.isdir(BASEDIR):
+        if not CREATEDIR:
+            print("ERROR: directory {} doesn't exist.".format(BASEDIR))
+            sys.exit(1)
+        try:
+            os.makedirs(BASEDIR)
+        except Exception as e:
+            print("ERROR: failed to create {}: {}".format(BASEDIR, e))
+            sys.exit(1)
 
-    GPGDIR = mkdtemp(prefix="x", dir=DIR)
+    GPGDIR = mkdtemp(prefix="x", dir=BASEDIR)
 
     c = RunProgram(cmd_gpg_import(GPGDIR), keydata, GPG_TIMEOUT)
     c.Start()
@@ -344,7 +361,8 @@ if __name__ == '__main__':
         print("ERROR: deleting gpg directory: {}".format(GPGDIR))
         sys.exit(11)
 
-    try:
-        os.rmdir(DIR)
-    except (FileNotFoundError, OSError):
-        pass
+    if CREATEDIR:
+        try:
+            os.rmdir(BASEDIR)
+        except (FileNotFoundError, OSError):
+            pass
